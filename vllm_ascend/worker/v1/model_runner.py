@@ -6816,6 +6816,25 @@ class NPUModelRunner(GPUModelRunner):
             elif isinstance(attn_module, CacheOnlyAttentionLayer):
                 # Only CacheOnlyAttentionLayer (extract_hidden_states draft model)
                 # is handled here.
+                # With hs_store_device=cpu the hidden states are kept off the
+                # NPU hybrid KV pool: TP0 streams them to per-request CPU
+                # pages via the connector's save_hs_batch; other ranks store
+                # nothing.
+                kv_transfer_config = self.vllm_config.kv_transfer_config
+                hs_store_device = "device"
+                if kv_transfer_config is not None:
+                    hs_store_device = str(
+                        kv_transfer_config.get_from_extra_config(
+                            "hs_store_device", "device"
+                        )
+                    ).lower()
+                if hs_store_device == "cpu":
+                    logger.info(
+                        "Hidden states stored on TP0 CPU pages: skip NPU "
+                        "kv_cache_spec for %s",
+                        layer_name,
+                    )
+                    continue
                 if spec := attn_module.get_kv_cache_spec(self.vllm_config):
                     # Rebuild to a fresh, picklable spec (the returned one
                     # references a stale MLAAttentionSpec class shadowed by

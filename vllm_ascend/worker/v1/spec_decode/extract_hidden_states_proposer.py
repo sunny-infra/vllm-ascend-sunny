@@ -36,8 +36,11 @@ class AscendExtractHiddenStatesProposer(ExtractHiddenStatesProposer):
     """
 
     def __init__(self, vllm_config: VllmConfig, device: torch.device, runner=None):
-        self.runner = runner
+        # Assign after super().__init__: newer vLLM base classes also assign
+        # self.runner from their own (optional) runner argument, so setting it
+        # here afterwards keeps the reference valid on both old and new vLLM.
         super().__init__(vllm_config, device)
+        self.runner = runner
 
     @torch.inference_mode()
     def _determine_batch_execution_and_padding(
